@@ -1,0 +1,37 @@
+{
+  "title": "Blue Marble Next Generation Base Map, August 2004",
+  "credit": "NASA Earth Observatory, Blue Marble Next Generation, Reto Stöckli (NASA/GSFC)",
+  "source_page": "https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-map/",
+  "source_image": "https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-base/august/world.200408.3x5400x2700.jpg",
+  "usage_guidelines": "https://www.nasa.gov/nasa-brand-center/images-and-media/",
+  "usage": "NASA content generally is not subject to copyright in the United States. NASA permits educational/informational computer graphical simulations under its media guidelines. Do not imply NASA endorsement or reuse NASA identifiers as branding.",
+  "source_size": [
+    5400,
+    2700
+  ],
+  "output_size": [
+    2048,
+    1024
+  ],
+  "processing": "Lanczos resize; JPEG quality 92, no artistic modifications",
+  "coordinates": {
+    "projection": "equirectangular",
+    "left_longitude": -180,
+    "right_longitude": 180,
+    "top_latitude": 90,
+    "bottom_latitude": -90,
+    "zero_longitude_u": 0.5,
+    "north_v_before_unpack_flip": 0,
+    "north_v_after_unpack_flip": 1
+  },
+  "files": {
+    "earth-color.jpg": {
+      "bytes": 386686,
+      "sha256": "6acce7ae4ebd6e39328ea38db30192033a557a52bfbe18a1a7767768a505c782"
+    },
+    "earth-color-original.jpg": {
+      "bytes": 1616254,
+      "sha256": "2048023ccc62250c677c0f4b03d4362f997b130eb0154a6cad00aa1b27c390b9"
+    }
+  }
+}

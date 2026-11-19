@@ -1,0 +1,131 @@
+참고 자료와 코드 적용
+
+강의와 제공 코드
+
+아래 파일 경로는 제공된 WebGL-master를 기준으로 한다. 줄 번호는 제공 원본의 위치이며 현재 프로젝트의 줄 번호와 다르다. 강의자료의 쪽수는 PDF 페이지 순서를 기준으로 한다.
+
+구와 정점 구성
+
+Chap6/shadedSphere3.js 53~99행의 삼각형 구성, 정규화한 구의 정점과 법선을 참고했다. 현재 지구는 텍스처의 위경도와 맞추기 위해 위도와 경도를 격자로 나누어 구성한다. 위경도에서 구의 좌표를 구하는 방법은 09-texture.pdf 35~41쪽, 특히 39쪽의 구 매핑과 10-discrete techniques.pdf 29쪽의 매개변수 표면을 바탕으로 적용했다. 각 칸은 삼각형 두 개로 나누며 극점에서 면적이 0인 삼각형은 만들지 않는다.
+
+고도에 따른 정점 변위
+
+10-discrete techniques.pdf 30쪽의 displacement mapping을 참고했다. 표면의 위치에 고도와 법선 방향을 이용한 변위를 더하는 방식이다. 현재 모형은 위경도 고도에서 음수 부분을 0으로 두고, 지구 반지름에 양수 고도를 더한다. 시각적으로 구분하기 위한 과장 배율은 별도로 둔다.
+
+Bump Mapping
+
+10-discrete techniques.pdf 31~33쪽과 Chap7/bumpMap2.js 26~38행을 참고했다. 높이의 차이를 구하고 정규화한 법선을 RGB 값으로 바꾸는 부분이다. Chap7/bumpMap2.html 34~50행의 법선·접선·종법선 좌표계와 70~75행의 texture2D, 법선 복원과 조명 계산도 참고했다.
+
+현재 모형에서는 ETOPO1의 인접한 고도를 동서·남북으로 비교한다. 위도에 따라 같은 경도 간격의 실제 거리가 달라지는 점을 계산에 반영하고, 그 차분으로 만든 법선을 텍스처에 저장한다. 셰이더에서는 접선 공간의 법선을 복원해 조명에 사용한다. 고도 배열을 구에 적용하는 과정은 제공된 평면 Bump Mapping 예제를 지구 좌표에 맞춰 구성한 부분이다.
+
+조명과 움직이는 광원
+
+Chap6/shadedSphere4.html 32~56행의 ambient, diffuse, specular 조명 계산을 참고했다. 지구의 표면 색과 법선에 따라 밝기를 계산하고 바다와 육지의 반사 정도를 구분한다. 광원이 움직이는 방식은 Chap7/bumpMap.js 213~218행과 10-discrete techniques.pdf 34쪽을 참고했다. 광원에는 지구의 자전 행렬을 곱하지 않고 view 변환만 적용한다.
+
+행렬과 공전
+
+Common/MV.js의 rotate, translate, mult, normalMatrix를 사용한다. rotate와 행렬 연결은 356~400행, normalMatrix는 968행 부근에서 확인할 수 있다. 자전은 기울기 행렬과 Y축 회전 행렬을 연결해 계산한다. 슈퍼맨의 공전은 지구 중심의 회전, 궤도 반지름만큼의 이동, 궤도 기울기 순서로 행렬을 연결한다. 부품을 상위 행렬에 연결하는 방식은 Chap9/figure.js 182~220행을 참고했다.
+
+관측과 투영
+
+Chap5/perspective2.js 153~160행의 lookAt, perspective와 반복 그리기를 참고했다. 마우스로 바꾸는 관찰 방향과 지구의 자전은 각각 계산한다. 법선은 model-view 행렬의 inverse transpose에 해당하는 normalMatrix로 변환한다.
+
+텍스처
+
+Chap7/bumpMap2.js 83~92행의 텍스처 생성과 gl.texImage2D를 참고했다. 색상 지도와 법선 지도를 서로 다른 텍스처 유닛에 연결하는 방식은 Chap7/textureCubev3.js 197~203행과 textureCubev3.html 60~66행을 참고했다. 색상 이미지와 고도 차분 법선 지도는 서로 다른 자료다.
+
+기본 화면과 입력
+
+04-interaction.pdf 27쪽의 requestAnimFrame, 30~31쪽의 버튼, 37~38쪽의 range 입력, 46~47쪽의 canvas 크기와 viewport 변경을 참고했다. 화면은 기본 HTML 요소로 배치하고 별도 CSS 파일이나 style 설정은 추가하지 않았다. Common/webgl-utils.js의 WebGL 사용 불가 안내에 들어 있는 원본 문자열은 제공 파일의 일부다.
+
+Common의 webgl-utils.js, initShaders.js, MV.js와 LICENSE.md는 제공 파일을 사용한다. 위경도 표본 처리, API 응답 검증과 화면의 입력 조합은 각 원리와 함수에 맞추어 작성한 부분이며, 프로젝트 전체 코드가 강의자료에 그대로 있다는 의미는 아니다.
+
+Codex 도움을 받은 범위
+
+슈퍼맨 디자인에 대한 감각이 부족하다고 느껴서 Codex를 이용했다. 도움을 받은 부분은 슈퍼맨의 모양과 지구 주위를 도는 모형 연결 코드이며, 아래 범위를 코드 오른쪽의 시작·끝 주석으로 표시한다. 입력한 원문 프롬프트는 보고서의 그림으로 남긴다.
+
+superman.js의 makeSupermanMesh 전체: 슈퍼맨의 정점, 법선, 색상과 몸통·팔다리·망토 등의 조형.
+earth-math.js의 orbitModel: 지구 중심의 기울어진 공전 행렬.
+earth.js에서 orbitModel을 호출한 뒤 supermanMesh를 그리는 두 줄: 슈퍼맨의 공전 위치 배치와 그리기.
+earth.js에서 makeSupermanMesh와 solidMesh, uploadMesh를 연결하는 두 줄: 슈퍼맨 모형 데이터와 GPU 버퍼 연결.
+
+NOAA 고도 자료
+
+자료명: ETOPO1 1 Arc-Minute Global Relief Model, Ice Surface.
+제작 기관: NOAA National Geophysical Data Center, 현재 NOAA National Centers for Environmental Information.
+고도 단위: 미터. 수직 기준은 해수면이며 수평 좌표는 WGS84다. 육지 지형, 해저 지형, 빙상 표면을 포함한다.
+
+자료 설명
+https://www.ncei.noaa.gov/products/etopo-global-relief-model
+https://www.ngdc.noaa.gov/mgg/global/relief/
+
+인용
+Amante, C. and B. W. Eakins, 2009. ETOPO1 1 Arc-Minute Global Relief Model: Procedures, Data Sources and Analysis. NOAA Technical Memorandum NESDIS NGDC-24.
+https://doi.org/10.7289/V5C8276M
+
+API의 원래 고도 데이터 간격은 1 arc-minute이며, 프로그램은 전 지구 모형에 사용할 값을 위도와 경도 0.5° 간격으로 요청한다. 시작할 때 받은 고도 데이터로 지형과 Bump Mapping용 법선을 만든다. 단일 위치의 고도는 더 촘촘한 API의 원래 고도 데이터에서 조회하므로 모형용 값과 차이가 날 수 있다.
+
+PacIOOS ERDDAP 고도 API
+
+자료 제작과 API 제공을 구분한다. 고도 자료는 NOAA ETOPO1이며 네트워크 요청은 PacIOOS ERDDAP의 etopo1_ice 데이터셋에 보낸다.
+
+데이터셋과 사용 조건
+https://pae-paha.pacioos.hawaii.edu/erddap/griddap/etopo1_ice.html
+
+griddap 요청 형식과 JSON 응답 설명
+https://pae-paha.pacioos.hawaii.edu/erddap/griddap/documentation.html
+
+전 지구 요청
+https://pae-paha.pacioos.hawaii.edu/erddap/griddap/etopo1_ice.json?z[(-90):30:(90)][(-180):30:(180)]
+
+단일 위경도 요청 예시
+https://pae-paha.pacioos.hawaii.edu/erddap/griddap/etopo1_ice.json?z[(37.5665)][(126.978)]
+
+대괄호 안의 괄호는 좌표 값을 지정한다. 30은 API의 원래 고도 데이터에서 30칸마다 고르는 stride이며 30°가 아니다. 1 arc-minute의 30칸이므로 간격은 0.5°다. 단일 좌표는 API의 원래 고도 데이터 중 가까운 격자의 좌표와 고도가 반환된다. JSON의 table에는 columnNames, columnUnits, rows가 있으며 rows의 각 원소는 위도, 경도, 고도 순서다.
+
+브라우저에서는 CORS 응답을 허용하는 이 서비스에 fetch로 요청한다. API 키는 필요하지 않다. 프로그램 시작 시 전 지구 고도 721×361개를 API에서 받아야 지구를 표시한다. API 응답의 남→북 행 순서를 모형용 북→남 배열로 바꾸고 값의 개수, 좌표와 유효한 고도인지 확인한 뒤 적용한다.
+
+데이터셋에 공개된 사용 조건에는 자료를 무료로 사용하고 재배포할 수 있다는 내용이 포함되어 있다. 자료 설명과 출처를 함께 남긴다. 서비스나 자료가 이 프로젝트를 검토하거나 보증한다는 의미로 표시하지 않는다.
+
+서울 조회 좌표는 위도 37.5665, 경도 126.9780이다. 오스틴은 미국 텍사스주의 Austin을 뜻하며 조회 좌표는 위도 30.2672, 경도 -97.7431이다. 두 버튼은 입력 좌표를 선택하는 용도이며 고도 조회 결과의 주황색 모형은 조회 위치를 나타낸다.
+
+NASA 색상 지도
+
+자료명: Blue Marble Next Generation Base Map, August 2004.
+출처 표기: NASA Earth Observatory. Blue Marble Next Generation 제작은 Reto Stöckli, NASA Goddard Space Flight Center.
+
+설명과 원본
+https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-map/
+https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/
+https://assets.science.nasa.gov/content/dam/science/esd/eo/images/bmng/bmng-base/august/world.200408.3x5400x2700.jpg
+
+사용 조건
+https://www.nasa.gov/nasa-brand-center/images-and-media/
+
+NASA는 해당 가이드라인에 따라 교육·정보 목적의 이미지와 3D 시뮬레이션용 자료 사용을 허용하며 NASA를 출처로 표시하도록 안내한다. 이 프로젝트에서는 지도 원본의 NASA Earth Observatory 출처를 유지한다. NASA의 보증이나 공식 제휴를 나타내는 용도로 사용하지 않는다.
+
+원본 5400×2700 이미지를 2048×1024로 축소해 색상 텍스처로 사용한다. 이미지에 새 지형을 그려 넣지는 않는다. 원본과 축소 파일, 처리 규격과 해시는 assets 폴더에 둔다. HTTP 서버에서 assets/earth-color.jpg를 일반 이미지 파일로 불러온다.
+
+바다색 혼합
+
+바다는 RGB (26, 89, 106), (36, 127, 128), (131, 189, 174), (189, 226, 219)를 청록색 계열로 혼합하고 밤의 기준색은 (9, 23, 49)로 둔다. Fragment Shader에서 고도 마스크와 NASA 이미지의 파랑 성분을 함께 이용해 바다를 고른 뒤 영상의 명도에 따라 색을 섞고 조명을 적용한다. NASA 이미지 파일과 고도 데이터는 이 색보정으로 변경하지 않는다.
+
+추가로 참고한 브라우저 API
+
+Fetch API
+https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
+고도 API에 HTTP 요청을 보내고 Response.json으로 JSON 응답을 읽는 데 사용한다. response.ok로 HTTP 오류를 구분한다. fetch는 수업의 WebGL 렌더링 API와 다른 브라우저 네트워크 기능이다.
+
+AbortController
+https://developer.mozilla.org/en-US/docs/Web/API/AbortController
+요청에 signal을 연결하고 정한 대기 시간이 지나면 abort로 요청을 중단한다. setTimeout과 함께 사용하며, 완료되거나 실패하면 타이머를 해제한다.
+
+이미지 로드
+https://developer.mozilla.org/en-US/docs/Web/API/HTMLImageElement/Image
+new Image로 같은 HTTP 서버에 있는 JPG 파일을 읽고 onload에서 이미지가 준비된 뒤 텍스처를 생성한다.
+
+로컬 HTTP 실행
+
+https://docs.python.org/3/library/http.server.html
+
+Python의 http.server로 프로젝트 폴더를 로컬 HTTP 서버에서 열 수 있다. README.md의 명령으로 서버를 실행한 뒤 http://localhost:8000에서 접속한다. 지구 이미지 파일은 이 서버에서 읽고 고도 데이터는 PacIOOS API에서 받는다.

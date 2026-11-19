@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>WebGL 지구와 고도 지형</title>
+    <link rel="icon" href="data:,">
+</head>
+<body>
+<h1>WebGL 지구 <small>컴퓨터그래픽스 1분반 32230891 김영재</small></h1>
+<p>드래그해서 지구를 관찰하세요. 자전축은 23.44°이며 슈퍼맨은 지구 중심을 공전합니다.</p>
+<div>
+    <button id="spin-button">자전 일시정지</button>
+    자전 속도 <input id="spin-speed" aria-label="자전 속도" type="range" min="0" max="30" step="1" value="6"> <span id="spin-value">6</span>°/초
+    확대 <input id="zoom" aria-label="확대" type="range" min="70" max="160" step="1" value="100"> <span id="zoom-value">100</span>%
+    <button id="reset-view">시점 초기화</button>
+</div>
+<div>
+    지형 과장 <input id="height-scale" aria-label="지형 과장" type="range" min="1" max="100" step="1" value="35"> <span id="height-value">35</span>배
+    <label><input id="bump-enabled" type="checkbox" checked>Bump Mapping</label>
+    강도 <input id="bump-strength" aria-label="Bump 강도" type="range" min="0" max="4" step="0.1" value="1.3"> <span id="bump-value">1.3</span>
+    <label><input id="height-colors" type="checkbox">고도 색상</label>
+    <label><input id="show-axis" type="checkbox" checked>자전축</label>
+</div>
+<div>
+    광원 방향 <input id="light-angle" aria-label="광원 방향" type="range" min="-180" max="180" step="1" value="-35"> <span id="light-value">-35</span>°
+    <label><input id="light-moving" type="checkbox">광원 자동 이동</label>
+    <label><input id="superman-enabled" type="checkbox" checked>슈퍼맨 공전</label>
+    공전 속도 <input id="orbit-speed" aria-label="공전 속도" type="range" min="0" max="80" step="1" value="22"> <span id="orbit-value">22</span>°/초
+    <label><input id="show-orbit" type="checkbox" checked>궤도</label>
+</div>
+<p id="render-status" role="status">고도 API에 연결해 지구를 준비하고 있습니다.</p>
+<canvas id="gl-canvas" width="960" height="600" aria-label="고도 정보를 적용한 3차원 지구">WebGL을 지원하는 브라우저가 필요합니다.</canvas>
+<fieldset>
+    <legend>고도 API</legend>
+    <div>
+        <label>위도 <input id="latitude" type="number" min="-90" max="90" step="any" value="37.5665"></label>
+        <label>경도 <input id="longitude" type="number" min="-180" max="180" step="any" value="126.9780"></label>
+        <button id="query-elevation" disabled>고도 조회</button>
+        <button id="place-seoul">서울</button>
+        <button id="place-austin">오스틴 텍사스</button>
+        <button id="reload-elevation" disabled>전 지구 고도 다시 불러오기</button>
+    </div>
+    <p id="api-status" role="status">지구가 준비되면 API의 원래 고도 데이터에서 입력한 좌표와 가장 가까운 위치의 고도를 조회할 수 있습니다.</p>
+    <p id="data-status">처음 실행할 때 전 지구 고도를 API에서 받아 지형과 Bump Mapping을 만듭니다. 인터넷 연결이 필요합니다.</p>
+</fieldset>
+<p>자료: <a href="https://pae-paha.pacioos.hawaii.edu/erddap/griddap/etopo1_ice.html">NOAA ETOPO1 · PacIOOS API</a> / <a href="https://science.nasa.gov/earth/earth-observatory/blue-marble-next-generation/base-map/">NASA Blue Marble</a>. 고도 과장은 관찰을 위한 것이며 실제 축척과 다릅니다.</p>
+
+<script id="vertex-shader" type="x-shader/x-vertex">
+attribute vec4 vPosition;
+attribute vec3 vNormal;
+attribute vec3 vTangent;
+attribute vec2 vTexCoord;
+attribute vec4 vColor;
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+uniform mat3 normalMatrix;
+varying vec3 fPosition;
+varying vec3 fNormal;
+varying vec3 fTangent;
+varying vec2 fTexCoord;
+varying vec4 fColor;
+void main() {
+    vec4 position = modelViewMatrix * vPosition;
+    gl_Position = projectionMatrix * position;
+    fPosition = position.xyz;
+    fNormal = normalize(normalMatrix * vNormal);
+    fTangent = normalize(normalMatrix * vTangent);
+    fTexCoord = vTexCoord;
+    fColor = vColor;
+}
+</script>
+<script id="fragment-shader" type="x-shader/x-fragment">
+precision mediump float;
+uniform sampler2D colorMap;
+uniform sampler2D normalMap;
+uniform vec3 lightDirection;
+uniform float bumpStrength;
+uniform float heightColors;
+uniform int material;
+varying vec3 fPosition;
+varying vec3 fNormal;
+varying vec3 fTangent;
+varying vec2 fTexCoord;
+varying vec4 fColor;
+void main() {
+    vec3 N = normalize(fNormal);
+    vec3 base = fColor.rgb;
+    float ocean = 0.0;
+    float waterMask = 0.0;
+    if (material == 0) {
+        vec4 mapped = texture2D(normalMap, fTexCoord);
+        vec3 T = normalize(fTangent - dot(fTangent, N) * N);
+        vec3 B = normalize(cross(N, T));
+        vec3 bump = mapped.rgb * 2.0 - 1.0;
+        bump = normalize(vec3(bump.xy * bumpStrength, bump.z));
+        N = normalize(T * bump.x + B * bump.y + N * bump.z);
+        base = texture2D(colorMap, fTexCoord).rgb;
+        ocean = 1.0 - smoothstep(0.0, 0.012, mapped.a);
+        float blue = smoothstep(0.012, 0.055, base.b - base.r) * smoothstep(0.006, 0.030, base.b - base.g);
+        waterMask = ocean * blue; // 높이와 원본 바다색을 함께 확인
+        float brightness = dot(base, vec3(0.2126, 0.7152, 0.0722));
+        vec3 deepSea = vec3(26.0, 89.0, 106.0) / 255.0;
+        vec3 tealSea = vec3(36.0, 127.0, 128.0) / 255.0;
+        vec3 lightSea = vec3(131.0, 189.0, 174.0) / 255.0;
+        vec3 paleSea = vec3(189.0, 226.0, 219.0) / 255.0;
+        vec3 sea = mix(deepSea, tealSea, 0.35 + 0.65 * smoothstep(0.008, 0.12, brightness));
+        sea = mix(sea, lightSea, 0.55 * smoothstep(0.07, 0.30, brightness));
+        sea = mix(sea, paleSea, 0.25 * smoothstep(0.25, 0.55, brightness)); // 원본 명도를 색 구분에 사용
+        vec3 lowland = vec3(0.16, 0.46, 0.19);
+        vec3 mountain = mix(vec3(0.55, 0.38, 0.18), vec3(0.95), smoothstep(0.30, 0.65, mapped.a));
+        vec3 relief = mix(lowland, mountain, smoothstep(0.04, 0.28, mapped.a));
+        relief = mix(relief, vec3(0.025, 0.17, 0.44), ocean);
+        base = mix(base, relief, heightColors);
+        base = mix(base, sea, waterMask);
+    }
+    if (material == 2) {
+        gl_FragColor = vec4(base, 1.0);
+    } else {
+        vec3 L = normalize(lightDirection);
+        vec3 V = normalize(-fPosition);
+        vec3 H = normalize(L + V);
+        float diffuse = max(dot(N, L), 0.0);
+        float specular = 0.0;
+        if (diffuse > 0.0) specular = pow(max(dot(N, H), 0.0), 40.0);
+        float shine = material == 0 ? 0.05 + 0.20 * ocean : 0.15;
+        vec3 color = base * (0.11 + 0.89 * diffuse) + vec3(shine * specular);
+        if (waterMask > 0.0) {
+            vec3 nightSea = vec3(9.0, 23.0, 49.0) / 255.0;
+            vec3 waterLight = mix(nightSea * 0.45, base, 0.15 + 0.85 * diffuse) + vec3(shine * specular);
+            color = mix(color, waterLight, waterMask); // 밤은 어둡게 두고 낮의 청록색을 강조
+        }
+        gl_FragColor = vec4(color, 1.0);
+    }
+}
+</script>
+<script src="Common/webgl-utils.js"></script>
+<script src="Common/initShaders.js"></script>
+<script src="Common/MV.js"></script>
+<script src="earth-math.js"></script>
+<script src="superman.js"></script>
+<script src="earth.js"></script>
+</body>
+</html>
