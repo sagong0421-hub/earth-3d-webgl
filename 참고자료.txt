@@ -51,7 +51,7 @@ earth.js에서 makeSupermanMesh와 solidMesh, uploadMesh를 연결하는 두 줄
 
 NOAA 고도 자료
 
-자료명: ETOPO1 1 Arc-Minute Global Relief Model, Ice Surface.
+자료명: ETOPO1 Global Relief Model, Ice Surface. API의 원래 고도 데이터 간격은 약 0.0167도다.
 제작 기관: NOAA National Geophysical Data Center, 현재 NOAA National Centers for Environmental Information.
 고도 단위: 미터. 수직 기준은 해수면이며 수평 좌표는 WGS84다. 육지 지형, 해저 지형, 빙상 표면을 포함한다.
 
@@ -63,27 +63,28 @@ https://www.ngdc.noaa.gov/mgg/global/relief/
 Amante, C. and B. W. Eakins, 2009. ETOPO1 1 Arc-Minute Global Relief Model: Procedures, Data Sources and Analysis. NOAA Technical Memorandum NESDIS NGDC-24.
 https://doi.org/10.7289/V5C8276M
 
-API의 원래 고도 데이터 간격은 1 arc-minute이며, 프로그램은 전 지구 모형에 사용할 값을 위도와 경도 0.5° 간격으로 요청한다. 시작할 때 받은 고도 데이터로 지형과 Bump Mapping용 법선을 만든다. 단일 위치의 고도는 더 촘촘한 API의 원래 고도 데이터에서 조회하므로 모형용 값과 차이가 날 수 있다.
+프로그램은 전 지구 모형에 사용할 값을 위도와 경도 0.5도 간격으로 요청한다. 시작할 때 받은 고도 데이터로 지형과 Bump Mapping용 법선을 만든다. 단일 위치의 고도는 약 0.0167도 간격인 API의 원래 고도 데이터에서 조회하므로 모형용 값과 차이가 날 수 있다.
 
-PacIOOS ERDDAP 고도 API
+NOAA CoastWatch ERDDAP 고도 API
 
-자료 제작과 API 제공을 구분한다. 고도 자료는 NOAA ETOPO1이며 네트워크 요청은 PacIOOS ERDDAP의 etopo1_ice 데이터셋에 보낸다.
+고도 자료는 NOAA ETOPO1이며 네트워크 요청은 NOAA CoastWatch ERDDAP의 etopo180 데이터셋에 보낸다. 고도 변수의 이름은 altitude이며 미터 단위다.
 
 데이터셋과 사용 조건
-https://pae-paha.pacioos.hawaii.edu/erddap/griddap/etopo1_ice.html
+https://coastwatch.pfeg.noaa.gov/erddap/griddap/etopo180.html
 
-griddap 요청 형식과 JSON 응답 설명
-https://pae-paha.pacioos.hawaii.edu/erddap/griddap/documentation.html
+griddap 요청 형식과 JSONP 응답 설명
+https://coastwatch.pfeg.noaa.gov/erddap/griddap/documentation.html
+https://coastwatch.pfeg.noaa.gov/erddap/rest.html
 
-전 지구 요청
-https://pae-paha.pacioos.hawaii.edu/erddap/griddap/etopo1_ice.json?z[(-90):30:(90)][(-180):30:(180)]
+전 지구 요청 예시
+https://coastwatch.pfeg.noaa.gov/erddap/griddap/etopo180.json?altitude[(-90):30:(90)][(-180):30:(180)]&.jsonp=receiveElevationData
 
 단일 위경도 요청 예시
-https://pae-paha.pacioos.hawaii.edu/erddap/griddap/etopo1_ice.json?z[(37.5665)][(126.978)]
+https://coastwatch.pfeg.noaa.gov/erddap/griddap/etopo180.json?altitude[(37.5665)][(126.978)]&.jsonp=receiveElevationData
 
-대괄호 안의 괄호는 좌표 값을 지정한다. 30은 API의 원래 고도 데이터에서 30칸마다 고르는 stride이며 30°가 아니다. 1 arc-minute의 30칸이므로 간격은 0.5°다. 단일 좌표는 API의 원래 고도 데이터 중 가까운 격자의 좌표와 고도가 반환된다. JSON의 table에는 columnNames, columnUnits, rows가 있으며 rows의 각 원소는 위도, 경도, 고도 순서다.
+대괄호 안의 괄호는 좌표 값을 지정한다. 30은 API의 원래 고도 데이터에서 30칸마다 고르는 stride이며 30도가 아니다. 선택한 격자의 간격은 0.5도다. 단일 좌표는 API의 원래 고도 데이터 중 가까운 격자의 좌표와 고도가 반환된다. 응답의 table에는 columnNames, columnUnits, rows가 있으며 rows의 각 원소는 위도, 경도, altitude 순서다.
 
-브라우저에서는 CORS 응답을 허용하는 이 서비스에 fetch로 요청한다. API 키는 필요하지 않다. 프로그램 시작 시 전 지구 고도 721×361개를 API에서 받아야 지구를 표시한다. API 응답의 남→북 행 순서를 모형용 북→남 배열로 바꾸고 값의 개수, 좌표와 유효한 고도인지 확인한 뒤 적용한다.
+브라우저에서는 ERDDAP이 공식적으로 지원하는 JSONP로 응답을 받으며 API 키는 필요하지 않다. 프로그램 시작 시 전 지구 고도 721×361개를 API에서 받아야 지구를 표시한다. API 응답의 남→북 행 순서를 모형용 북→남 배열로 바꾸고 값의 개수, 좌표와 유효한 고도인지 확인한 뒤 적용한다.
 
 데이터셋에 공개된 사용 조건에는 자료를 무료로 사용하고 재배포할 수 있다는 내용이 포함되어 있다. 자료 설명과 출처를 함께 남긴다. 서비스나 자료가 이 프로젝트를 검토하거나 보증한다는 의미로 표시하지 않는다.
 
@@ -110,15 +111,17 @@ NASA는 해당 가이드라인에 따라 교육·정보 목적의 이미지와 3
 
 바다는 RGB (26, 89, 106), (36, 127, 128), (131, 189, 174), (189, 226, 219)를 청록색 계열로 혼합하고 밤의 기준색은 (9, 23, 49)로 둔다. Fragment Shader에서 고도 마스크와 NASA 이미지의 파랑 성분을 함께 이용해 바다를 고른 뒤 영상의 명도에 따라 색을 섞고 조명을 적용한다. NASA 이미지 파일과 고도 데이터는 이 색보정으로 변경하지 않는다.
 
-추가로 참고한 브라우저 API
+추가로 참고한 응답 처리
 
-Fetch API
-https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch
-고도 API에 HTTP 요청을 보내고 Response.json으로 JSON 응답을 읽는 데 사용한다. response.ok로 HTTP 오류를 구분한다. fetch는 수업의 WebGL 렌더링 API와 다른 브라우저 네트워크 기능이다.
+ERDDAP JSONP
+https://coastwatch.pfeg.noaa.gov/erddap/rest.html
+https://coastwatch.pfeg.noaa.gov/erddap/griddap/documentation.html
+공식 설명에 따라 요청 주소 끝에 &.jsonp=콜백이름을 붙인다. ERDDAP은 콜백이름(JSON응답) 형태의 자바스크립트를 돌려준다. 위 요청 예시의 receiveElevationData는 형식을 설명하기 위한 이름이며 실행 코드에서는 요청마다 구분되는 이름을 만든다.
 
-AbortController
-https://developer.mozilla.org/en-US/docs/Web/API/AbortController
-요청에 signal을 연결하고 정한 대기 시간이 지나면 abort로 요청을 중단한다. setTimeout과 함께 사용하며, 완료되거나 실패하면 타이머를 해제한다.
+script와 콜백 정리
+https://developer.mozilla.org/en-US/docs/Web/API/HTMLScriptElement
+https://developer.mozilla.org/en-US/docs/Web/API/Window/setTimeout
+고도 요청 주소를 script 요소의 src에 지정하고 window에 등록한 콜백에서 데이터를 받는다. 정상 응답이나 연결 오류를 처리한 뒤에는 script 요소, 타이머와 콜백을 정리한다. 정해진 시간 동안 응답이 없으면 실패로 처리하고 script 요소를 제거하되, 늦은 응답을 무시할 콜백은 60초 동안 잠시 유지한 뒤 제거한다.
 
 이미지 로드
 https://developer.mozilla.org/en-US/docs/Web/API/HTMLImageElement/Image
@@ -128,4 +131,4 @@ new Image로 같은 HTTP 서버에 있는 JPG 파일을 읽고 onload에서 이�
 
 https://docs.python.org/3/library/http.server.html
 
-Python의 http.server로 프로젝트 폴더를 로컬 HTTP 서버에서 열 수 있다. README.md의 명령으로 서버를 실행한 뒤 http://localhost:8000에서 접속한다. 지구 이미지 파일은 이 서버에서 읽고 고도 데이터는 PacIOOS API에서 받는다.
+Python의 http.server로 프로젝트 폴더를 로컬 HTTP 서버에서 열 수 있다. README.md의 명령으로 서버를 실행한 뒤 http://localhost:8000에서 접속한다. 지구 이미지 파일은 이 서버에서 읽고 고도 데이터는 NOAA CoastWatch API에서 받는다.

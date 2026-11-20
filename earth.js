@@ -4,7 +4,8 @@ var earthApp = {ready: false, initialized: false, colorReady: false, status: "in
 var canvas, gl, program, uniforms = {}, locations = {};
 var earthMesh, supermanMesh, axisMesh, orbitMesh, markerMesh;
 var colorTexture, normalTexture, elevationData = null;
-var apiBase = "https://pae-paha.pacioos.hawaii.edu/erddap/griddap/etopo1_ice.json?";
+var apiBase = "https://coastwatch.pfeg.noaa.gov/erddap/griddap/etopo180.json?";
+var jsonpSequence = 0;
 var state = {
     spin: -105, orbit: 65, lightAngle: -35, paused: false, orbitEnabled: true,
     lightMoving: false, zoom: 100, heightScale: 35, bumpStrength: 1.3,
@@ -191,29 +192,55 @@ function setBusy(busy) {
     element("reload-elevation").disabled = busy || !earthApp.initialized;
 }
 
-function requestJSON(url, timeout) {
-    var controller = new AbortController();
-    var timer = setTimeout(function () { controller.abort(); }, timeout);
-    return fetch(url, {signal: controller.signal, cache: "no-store"}).then(function (response) {
-        if (!response.ok) throw new Error("HTTP " + response.status);
-        return response.json();
-    }).then(function (data) {
-        clearTimeout(timer);
-        return data;
-    }, function (error) {
-        clearTimeout(timer);
-        throw error;
+function requestJSONP(url, timeout) {
+    return new Promise(function (resolve, reject) {
+        var script = document.createElement("script"), timer, cleanupTimer, finished = false;
+        var callback = "earthElevation_" + Date.now() + "_" + (++jsonpSequence);
+        while (callback in window) callback += "_";
+        function cleanup() {
+            clearTimeout(timer);
+            clearTimeout(cleanupTimer);
+            script.onload = null; script.onerror = null;
+            if (script.parentNode) script.parentNode.removeChild(script);
+            delete window[callback]; // 사용한 콜백과 script 제거
+        }
+        function finish(error, data) {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timer);
+            if (error) reject(error);
+            else resolve(data);
+        }
+        window[callback] = function (data) {
+            if (finished) return; // 늦게 오거나 중복된 응답은 무시
+            if (!data || !data.table || !Array.isArray(data.table.columnNames) || !Array.isArray(data.table.rows)) {
+                finish(new Error("고도 API 응답 형식이 다릅니다."));
+                return;
+            }
+            finish(null, data);
+        };
+        script.async = true;
+        script.onload = function () { finish(new Error("고도 API 콜백을 받지 못했습니다.")); cleanup(); };
+        script.onerror = function () { finish(new Error("고도 API에 연결하지 못했습니다.")); cleanup(); };
+        timer = setTimeout(function () {
+            finish(new Error("고도 API 응답 시간이 초과되었습니다."));
+            if (script.parentNode) script.parentNode.removeChild(script);
+            cleanupTimer = setTimeout(cleanup, 60000); // 늦은 응답을 잠시 받아 버린 뒤 정리
+        }, timeout);
+        script.src = url + "&.jsonp=" + callback; // NOAA가 제공하는 JSONP 사용
+        try { document.head.appendChild(script); }
+        catch (error) { finish(new Error("고도 API 요청을 시작하지 못했습니다.")); cleanup(); }
     });
 }
 
 function parseGlobalData(response) {
     var table = response && response.table;
-    if (!table || !Array.isArray(table.rows) || !Array.isArray(table.columnNames) || table.columnNames.join(",") !== "latitude,longitude,z" || table.rows.length !== 721 * 361) throw new Error("API 고도 데이터의 형식이 다릅니다.");
+    if (!table || !Array.isArray(table.rows) || !Array.isArray(table.columnNames) || table.columnNames.join(",") !== "latitude,longitude,altitude" || table.rows.length !== 721 * 361) throw new Error("API 고도 데이터의 형식이 다릅니다.");
     var values = new Array(721 * 361);
     for (var y = 0; y < 361; y++) {
         for (var x = 0; x < 721; x++) {
             var row = table.rows[y * 721 + x];
-            if (!Array.isArray(row) || row.length !== 3 || row.some(function (value) { return typeof value !== "number" || !isFinite(value); }) || Math.abs(row[0] - (-90 + y * 0.5)) > 0.0001 || Math.abs(row[1] - (-180 + x * 0.5)) > 0.0001) throw new Error("누락되거나 잘못된 API 고도 데이터가 있습니다.");
+            if (!Array.isArray(row) || row.length !== 3 || row.some(function (value) { return typeof value !== "number" || !isFinite(value); }) || row[2] === 32767 || Math.abs(row[0] - (-90 + y * 0.5)) > 0.0001 || Math.abs(row[1] - (-180 + x * 0.5)) > 0.0001) throw new Error("누락되거나 잘못된 API 고도 데이터가 있습니다.");
             values[(360 - y) * 721 + x] = row[2]; // API의 남→북 행을 북→남으로 변환
         }
     }
@@ -262,9 +289,9 @@ function reloadElevation() { // 실행할 때 API로 지구 구성
     element("render-status").textContent = "API에서 전 지구 고도를 받아 지구를 만들고 있습니다.";
     element("api-status").textContent = "전 지구 고도 260,281개를 API에서 불러오고 있습니다.";
     element("data-status").textContent = "고도 API 요청이 성공한 뒤 지형과 Bump Mapping을 만듭니다.";
-    var url = apiBase + "z%5B(-90):30:(90)%5D%5B(-180):30:(180)%5D";
+    var url = apiBase + "altitude%5B(-90):30:(90)%5D%5B(-180):30:(180)%5D";
     return loadColorTexture().then(function () {
-        return requestJSON(url, 45000);
+        return requestJSONP(url, 45000);
     }).then(function (response) {
         var fresh = parseGlobalData(response);
         elevationData = fresh;
@@ -283,7 +310,7 @@ function reloadElevation() { // 실행할 때 API로 지구 구성
     }).catch(function (error) {
         clearTerrain();
         earthApp.status = "error";
-        earthApp.error = error.name === "AbortError" ? "고도 API 응답 시간이 초과되었습니다." : error.message;
+        earthApp.error = error.message;
         element("render-status").textContent = "지구를 불러오지 못했습니다. 전 지구 고도 다시 불러오기 버튼으로 재시도하세요.";
         element("api-status").textContent = "지구 준비 실패: " + earthApp.error;
         element("data-status").textContent = "API 고도 데이터가 없어 지형을 표시하지 않습니다. 인터넷 연결과 API 상태를 확인한 뒤 다시 시도하세요.";
@@ -307,16 +334,16 @@ function queryElevation() { // 한 위치의 고도 조회
     }
     setBusy(true);
     element("api-status").innerHTML = "입력한 좌표의 고도를 조회하고 있습니다.";
-    return requestJSON(apiBase + "z%5B(" + lat + ")%5D%5B(" + lon + ")%5D", 20000).then(function (response) {
+    return requestJSONP(apiBase + "altitude%5B(" + lat + ")%5D%5B(" + lon + ")%5D", 20000).then(function (response) {
         var table = response && response.table;
-        if (!table || !Array.isArray(table.rows) || table.rows.length !== 1 || !Array.isArray(table.columnNames) || table.columnNames.join(",") !== "latitude,longitude,z") throw new Error("잘못된 응답");
+        if (!table || !Array.isArray(table.rows) || table.rows.length !== 1 || !Array.isArray(table.columnNames) || table.columnNames.join(",") !== "latitude,longitude,altitude") throw new Error("잘못된 응답");
         var row = table.rows[0];
-        if (!Array.isArray(row) || row.length !== 3 || row.some(function (v) { return typeof v !== "number" || !isFinite(v); }) || row[0] < -90 || row[0] > 90 || row[1] < -180 || row[1] > 180) throw new Error("고도 누락");
+        if (!Array.isArray(row) || row.length !== 3 || row.some(function (v) { return typeof v !== "number" || !isFinite(v); }) || row[2] === 32767 || row[0] < -90 || row[0] > 90 || row[1] < -180 || row[1] > 180) throw new Error("고도 누락");
         state.marker = {lat: row[0], lon: row[1], elevation: row[2]};
         state.paused = true;
         state.spin = -row[1]; state.yaw = 0; state.pitch = Math.max(-65, Math.min(65, row[0]));
         element("spin-button").innerHTML = "자전 시작";
-        element("api-status").textContent = "입력한 위치: " + lat.toFixed(4) + "°, " + lon.toFixed(4) + "° / API가 찾은 위치: " + row[0].toFixed(5) + "°, " + row[1].toFixed(5) + "° / 고도: " + row[2] + " m. 주황색으로 조회 위치를 표시했습니다. API의 원래 고도 데이터는 약 1′ 간격이므로 지구 표현에 사용하는 0.5° 간격 데이터와 값이 다를 수 있습니다.";
+        element("api-status").textContent = "입력한 위치: " + lat.toFixed(4) + "°, " + lon.toFixed(4) + "° / API가 찾은 위치: " + row[0].toFixed(5) + "°, " + row[1].toFixed(5) + "° / 고도: " + row[2] + " m. 주황색으로 조회 위치를 표시했습니다. API의 원래 고도 데이터는 약 0.0167° 간격(위도 방향 약 1.85 km)이므로 지구 표현에 사용하는 0.5° 간격 데이터와 값이 다를 수 있습니다.";
         setBusy(false);
         return true;
     }).catch(function () {
